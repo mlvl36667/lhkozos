@@ -642,11 +642,11 @@ impl<T: BeaconChainTypes> NetworkService<T> {
                 message_id,
                 validation_result,
             } => {
-                trace!(self.log, "Propagating gossipsub message";
-                    "propagation_peer" => ?propagation_source,
-                    "message_id" => %message_id,
-                    "validation_result" => ?validation_result
-                );
+//                info!(self.log, "Propagating gossipsub message";
+//                    "propagation_peer" => ?propagation_source,
+//                    "message_id" => %message_id,
+//                    "validation_result" => ?validation_result
+//                );
                 self.libp2p.report_message_validation_result(
                     &propagation_source,
                     message_id,
@@ -660,7 +660,7 @@ impl<T: BeaconChainTypes> NetworkService<T> {
                         topic_kinds.push(message.kind());
                     }
                 }
-                debug!(
+                info!(
                     self.log,
                     "Sending pubsub messages";
                     "count" => messages.len(),
@@ -774,7 +774,7 @@ impl<T: BeaconChainTypes> NetworkService<T> {
                 if !subscribed_topics.is_empty() {
                     info!(
                         self.log,
-                        "Subscribed to topics";
+                        "Subscribed to topics--";
                         "topics" => ?subscribed_topics.into_iter().map(|topic| format!("{}", topic)).collect::<Vec<_>>()
                     );
                 }
@@ -836,6 +836,7 @@ impl<T: BeaconChainTypes> NetworkService<T> {
     }
 
     fn on_attestation_service_msg(&mut self, msg: SubnetServiceMessage) {
+        info!(self.log, "on_attestation_service_msg ---- ");
         match msg {
             SubnetServiceMessage::Subscribe(subnet) => {
                 for fork_digest in self.required_gossip_fork_digests() {

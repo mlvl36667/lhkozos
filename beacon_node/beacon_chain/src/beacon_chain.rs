@@ -431,6 +431,18 @@ impl<T: BeaconChainTypes> BeaconChain<T> {
     /// Checks if a block is finalized.
     /// The finalization check is done with the block slot. The block root is used to verify that
     /// the finalized slot is in the canonical chain.
+    pub fn getbv(&self, at: &Attestation<T::EthSpec>) -> String{
+                    let mut bitvec0 = String::new();
+                    for (position, voted) in at.aggregation_bits.iter().enumerate() {
+                     if voted {
+                      bitvec0.push('1');
+                     };
+                     if !voted {
+                      bitvec0.push('0');
+                     }
+                     }
+     bitvec0
+    }
     pub fn is_finalized_block(
         &self,
         block_root: &Hash256,
@@ -2619,15 +2631,113 @@ impl<T: BeaconChainTypes> BeaconChain<T> {
                 move || {
                     let slot = block.slot();
                     let graffiti_string = block.message().body().graffiti().as_utf8_lossy();
+                    let inde = block.message().body().attestations()[0].data.index;
+                    let alen = block.message().body().attestations().len();
+
+                    let at0 = &block.message().body().attestations()[0];
+                    let at1 = &block.message().body().attestations()[1];
+                    let at2 = &block.message().body().attestations()[2];
+                    let at3 = &block.message().body().attestations()[3];
+                    let at4 = &block.message().body().attestations()[4];
+                    let at5 = &block.message().body().attestations()[5];
+                    let at6 = &block.message().body().attestations()[6];
+                    let at7 = &block.message().body().attestations()[7];
+                    let at8 = &block.message().body().attestations()[8];
+                    let at9 = &block.message().body().attestations()[9];
+                    let at10 = &block.message().body().attestations()[10];
+                    let at11 = &block.message().body().attestations()[11];
+                    let at12 = &block.message().body().attestations()[12];
+                    let at13 = &block.message().body().attestations()[13];
+                    let at14 = &block.message().body().attestations()[14];
+                    let at15 = &block.message().body().attestations()[15];
+                    let at16 = &block.message().body().attestations()[16];
+                    let at17 = &block.message().body().attestations()[17];
+                    let at18 = &block.message().body().attestations()[18];
+                    let at19 = &block.message().body().attestations()[19];
+                    let at20 = &block.message().body().attestations()[20];
+                    let at21 = &block.message().body().attestations()[21];
+                    let at22 = &block.message().body().attestations()[22];
+                    let at23 = &block.message().body().attestations()[23];
+                    let at24 = &block.message().body().attestations()[24];
+                    let at25 = &block.message().body().attestations()[25];
+                    let at26 = &block.message().body().attestations()[26];
+                    let at27 = &block.message().body().attestations()[27];
+                    let at28 = &block.message().body().attestations()[28];
+                    let at29 = &block.message().body().attestations()[29];
+
+                    let bitvec0 = chain.clone().getbv(at0);
+                    let bitvec1 = chain.clone().getbv(at1);
+                    let bitvec2 = chain.clone().getbv(at2);
+                    let bitvec3 = chain.clone().getbv(at3);
+                    let bitvec4 = chain.clone().getbv(at4);
+                    let bitvec5 = chain.clone().getbv(at5);
+                    let bitvec6 = chain.clone().getbv(at6);
+                    let bitvec7 = chain.clone().getbv(at7);
+                    let bitvec8 = chain.clone().getbv(at8);
+                    let bitvec9 = chain.clone().getbv(at9);
+                    let bitvec10 = chain.clone().getbv(at10);
+                    let bitvec11 = chain.clone().getbv(at11);
+                    let bitvec12 = chain.clone().getbv(at12);
+                    let bitvec13 = chain.clone().getbv(at13);
+                    let bitvec14 = chain.clone().getbv(at14);
+                    let bitvec15 = chain.clone().getbv(at15);
+                    let bitvec16 = chain.clone().getbv(at16);
+                    let bitvec17 = chain.clone().getbv(at17);
+                    let bitvec18 = chain.clone().getbv(at18);
+                    let bitvec19 = chain.clone().getbv(at19);
+                    let bitvec20 = chain.clone().getbv(at20);
+                    let bitvec21 = chain.clone().getbv(at21);
+                    let bitvec22 = chain.clone().getbv(at22);
+                    let bitvec23 = chain.clone().getbv(at23);
+                    let bitvec24 = chain.clone().getbv(at24);
+                    let bitvec25 = chain.clone().getbv(at25);
+                    let bitvec26 = chain.clone().getbv(at26);
+                    let bitvec27 = chain.clone().getbv(at27);
+                    let bitvec28 = chain.clone().getbv(at28);
+                    let bitvec29 = chain.clone().getbv(at29);
+
+
 
                     match GossipVerifiedBlock::new(block, &chain) {
                         Ok(verified) => {
-                            debug!(
+                            info!(
                                 chain.log,
                                 "Successfully verified gossip block";
                                 "graffiti" => graffiti_string,
                                 "slot" => slot,
                                 "root" => ?verified.block_root(),
+                                "index" => inde,
+                                "bitvec0" => bitvec0,
+                                "bitvec1" => bitvec1,
+                                "bitvec2" => bitvec2,
+                                "bitvec3" => bitvec3,
+                                "bitvec4" => bitvec4,
+                                "bitvec5" => bitvec5,
+                                "bitvec6" => bitvec6,
+                                "bitvec7" => bitvec7,
+                                "bitvec8" => bitvec8,
+                                "bitvec9" => bitvec9,
+                                "bitvec10" => bitvec10,
+                                "bitvec11" => bitvec11,
+                                "bitvec12" => bitvec12,
+                                "bitvec13" => bitvec13,
+                                "bitvec14" => bitvec14,
+                                "bitvec15" => bitvec15,
+                                "bitvec16" => bitvec16,
+                                "bitvec17" => bitvec17,
+                                "bitvec18" => bitvec18,
+                                "bitvec19" => bitvec19,
+                                "bitvec20" => bitvec20,
+                                "bitvec21" => bitvec21,
+                                "bitvec22" => bitvec22,
+                                "bitvec23" => bitvec23,
+                                "bitvec24" => bitvec24,
+                                "bitvec25" => bitvec25,
+                                "bitvec26" => bitvec26,
+                                "bitvec27" => bitvec27,
+                                "bitvec28" => bitvec28,
+                                "bitvec29" => bitvec29,
+                                "num_of_coms" => alen,
                             );
 
                             Ok(verified)

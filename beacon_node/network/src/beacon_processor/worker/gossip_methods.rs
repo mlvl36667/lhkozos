@@ -207,6 +207,12 @@ impl<T: BeaconChainTypes> Worker<T> {
 
     /// Penalizes a peer for misbehaviour.
     fn gossip_penalize_peer(&self, peer_id: PeerId, action: PeerAction, msg: &'static str) {
+            info!(
+                self.log,
+                "Penalizes a peer";
+                "peer" => %peer_id,
+                "action" => %action
+            );
         self.send_network_message(NetworkMessage::ReportPeer {
             peer_id,
             action,
@@ -395,7 +401,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                         BeaconChainError::ForkChoiceError(ForkChoiceError::InvalidAttestation(
                             e,
                         )) => {
-                            debug!(
+                            info!(
                                 self.log,
                                 "Attestation invalid for fork choice";
                                 "reason" => ?e,
@@ -417,7 +423,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                     .chain
                     .add_to_naive_aggregation_pool(&verified_attestation)
                 {
-                    debug!(
+                    info!(
                         self.log,
                         "Attestation invalid for agg pool";
                         "reason" => ?e,
@@ -598,7 +604,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                         BeaconChainError::ForkChoiceError(ForkChoiceError::InvalidAttestation(
                             e,
                         )) => {
-                            debug!(
+                            info!(
                                 self.log,
                                 "Aggregate invalid for fork choice";
                                 "reason" => ?e,
@@ -617,7 +623,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                 }
 
                 if let Err(e) = self.chain.add_to_block_inclusion_pool(verified_aggregate) {
-                    debug!(
+                    info!(
                         self.log,
                         "Attestation invalid for op pool";
                         "reason" => ?e,
@@ -681,6 +687,11 @@ impl<T: BeaconChainTypes> Worker<T> {
             .await
         {
             let block_root = gossip_verified_block.block_root;
+            info!(
+                    self.log,
+                    "RPC block is being imported";
+                    "block_root" => %block_root,
+                );
 
             if let Some(handle) = duplicate_cache.check_and_insert(block_root) {
                 self.process_gossip_verified_block(
@@ -694,7 +705,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                 // Drop the handle to remove the entry from the cache
                 drop(handle);
             } else {
-                debug!(
+                info!(
                     self.log,
                     "RPC block is being imported";
                     "block_root" => %block_root,
@@ -753,7 +764,7 @@ impl<T: BeaconChainTypes> Worker<T> {
             Ok(verified_block) => {
                 if block_delay >= self.chain.slot_clock.unagg_attestation_production_delay() {
                     metrics::inc_counter(&metrics::BEACON_BLOCK_GOSSIP_ARRIVED_LATE_TOTAL);
-                    debug!(
+                    info!(
                         self.log,
                         "Gossip block arrived late";
                         "block_root" => ?verified_block.block_root,
@@ -769,6 +780,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                     "slot" => verified_block.block.slot(),
                     "root" => ?verified_block.block_root
                 );
+
                 self.propagate_validation_result(message_id, peer_id, MessageAcceptance::Accept);
 
                 // Log metrics to keep track of propagation delay times.
@@ -786,7 +798,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                 verified_block
             }
             Err(BlockError::ParentUnknown(block)) => {
-                debug!(
+                info!(
                     self.log,
                     "Unknown parent for gossip block";
                     "root" => ?block_root
@@ -795,7 +807,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                 return None;
             }
             Err(e @ BlockError::BeaconChainError(_)) => {
-                debug!(
+                info!(
                     self.log,
                     "Gossip block beacon chain error";
                     "error" => ?e,
@@ -808,7 +820,7 @@ impl<T: BeaconChainTypes> Worker<T> {
             | Err(e @ BlockError::BlockIsAlreadyKnown)
             | Err(e @ BlockError::RepeatProposal { .. })
             | Err(e @ BlockError::NotFinalizedDescendant { .. }) => {
-                debug!(self.log, "Could not verify block for gossip. Ignoring the block";
+                info!(self.log, "Could not verify block for gossip. Ignoring the block";
                             "error" => %e);
                 // Prevent recurring behaviour by penalizing the peer slightly.
                 self.gossip_penalize_peer(
@@ -820,7 +832,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                 return None;
             }
             Err(ref e @ BlockError::ExecutionPayloadError(ref epe)) if !epe.penalize_peer() => {
-                debug!(self.log, "Could not verify block for gossip. Ignoring the block";
+                info!(self.log, "Could not verify block for gossip. Ignoring the block";
                             "error" => %e);
                 self.propagate_validation_result(message_id, peer_id, MessageAcceptance::Ignore);
                 return None;
@@ -976,7 +988,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                     )
                 };
 
-                debug!(
+                info!(
                     self.log,
                     "Gossipsub block processed";
                     "block" => ?block_root,
@@ -1000,14 +1012,14 @@ impl<T: BeaconChainTypes> Worker<T> {
                 ));
             }
             Err(ref e @ BlockError::ExecutionPayloadError(ref epe)) if !epe.penalize_peer() => {
-                debug!(
+                info!(
                     self.log,
                     "Failed to verify execution payload";
                     "error" => %e
                 );
             }
             other => {
-                debug!(
+                info!(
                     self.log,
                     "Invalid gossip beacon block";
                     "outcome" => ?other,
@@ -1050,7 +1062,7 @@ impl<T: BeaconChainTypes> Worker<T> {
             Ok(ObservationOutcome::New(exit)) => exit,
             Ok(ObservationOutcome::AlreadyKnown) => {
                 self.propagate_validation_result(message_id, peer_id, MessageAcceptance::Ignore);
-                debug!(
+                info!(
                     self.log,
                     "Dropping exit for already exiting validator";
                     "validator_index" => validator_index,
@@ -1059,7 +1071,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                 return;
             }
             Err(e) => {
-                debug!(
+                info!(
                     self.log,
                     "Dropping invalid exit";
                     "validator_index" => validator_index,
@@ -1091,7 +1103,7 @@ impl<T: BeaconChainTypes> Worker<T> {
 
         self.chain.import_voluntary_exit(exit);
 
-        debug!(self.log, "Successfully imported voluntary exit");
+        info!(self.log, "Successfully imported voluntary exit");
 
         metrics::inc_counter(&metrics::BEACON_PROCESSOR_EXIT_IMPORTED_TOTAL);
     }
@@ -1110,7 +1122,7 @@ impl<T: BeaconChainTypes> Worker<T> {
         {
             Ok(ObservationOutcome::New(slashing)) => slashing,
             Ok(ObservationOutcome::AlreadyKnown) => {
-                debug!(
+                info!(
                     self.log,
                     "Dropping proposer slashing";
                     "reason" => "Already seen a proposer slashing for that validator",
@@ -1123,7 +1135,7 @@ impl<T: BeaconChainTypes> Worker<T> {
             Err(e) => {
                 // This is likely a fault with the beacon chain and not necessarily a
                 // malicious message from the peer.
-                debug!(
+                info!(
                     self.log,
                     "Dropping invalid proposer slashing";
                     "validator_index" => validator_index,
@@ -1153,7 +1165,7 @@ impl<T: BeaconChainTypes> Worker<T> {
             .register_gossip_proposer_slashing(slashing.as_inner());
 
         self.chain.import_proposer_slashing(slashing);
-        debug!(self.log, "Successfully imported proposer slashing");
+        info!(self.log, "Successfully imported proposer slashing");
 
         metrics::inc_counter(&metrics::BEACON_PROCESSOR_PROPOSER_SLASHING_IMPORTED_TOTAL);
     }
@@ -1170,7 +1182,7 @@ impl<T: BeaconChainTypes> Worker<T> {
         {
             Ok(ObservationOutcome::New(slashing)) => slashing,
             Ok(ObservationOutcome::AlreadyKnown) => {
-                debug!(
+                info!(
                     self.log,
                     "Dropping attester slashing";
                     "reason" => "Slashings already known for all slashed validators",
@@ -1180,7 +1192,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                 return;
             }
             Err(e) => {
-                debug!(
+                info!(
                     self.log,
                     "Dropping invalid attester slashing";
                     "peer" => %peer_id,
@@ -1208,7 +1220,7 @@ impl<T: BeaconChainTypes> Worker<T> {
             .register_gossip_attester_slashing(slashing.as_inner());
 
         self.chain.import_attester_slashing(slashing);
-        debug!(self.log, "Successfully imported attester slashing");
+        info!(self.log, "Successfully imported attester slashing");
         metrics::inc_counter(&metrics::BEACON_PROCESSOR_ATTESTER_SLASHING_IMPORTED_TOTAL);
     }
 
@@ -1228,7 +1240,7 @@ impl<T: BeaconChainTypes> Worker<T> {
             Ok(ObservationOutcome::New(change)) => change,
             Ok(ObservationOutcome::AlreadyKnown) => {
                 self.propagate_validation_result(message_id, peer_id, MessageAcceptance::Ignore);
-                debug!(
+                info!(
                     self.log,
                     "Dropping BLS to execution change";
                     "validator_index" => validator_index,
@@ -1237,7 +1249,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                 return;
             }
             Err(e) => {
-                debug!(
+                info!(
                     self.log,
                     "Dropping invalid BLS to execution change";
                     "validator_index" => validator_index,
@@ -1246,6 +1258,13 @@ impl<T: BeaconChainTypes> Worker<T> {
                 );
                 // We ignore pre-capella messages without penalizing peers.
                 if matches!(e, BeaconChainError::BlsToExecutionPriorToCapella) {
+                info!(
+                    self.log,
+                    "We ignore pre-capella messages without penalizing peers";
+                    "validator_index" => validator_index,
+                    "peer" => %peer_id,
+                    "error" => ?e
+                );
                     self.propagate_validation_result(
                         message_id,
                         peer_id,
@@ -1279,7 +1298,7 @@ impl<T: BeaconChainTypes> Worker<T> {
         self.chain
             .import_bls_to_execution_change(change, received_pre_capella);
 
-        debug!(
+        info!(
             self.log,
             "Successfully imported BLS to execution change";
             "validator_index" => validator_index,
@@ -1341,7 +1360,7 @@ impl<T: BeaconChainTypes> Worker<T> {
             .chain
             .add_to_naive_sync_aggregation_pool(sync_signature)
         {
-            debug!(
+            info!(
                 self.log,
                 "Sync committee signature invalid for agg pool";
                 "reason" => ?e,
@@ -1403,7 +1422,7 @@ impl<T: BeaconChainTypes> Worker<T> {
             .chain
             .add_contribution_to_block_inclusion_pool(sync_contribution)
         {
-            debug!(
+            info!(
                 self.log,
                 "Sync contribution invalid for op pool";
                 "reason" => ?e,
@@ -1425,13 +1444,18 @@ impl<T: BeaconChainTypes> Worker<T> {
             .verify_finality_update_for_gossip(light_client_finality_update, seen_timestamp)
         {
             Ok(_verified_light_client_finality_update) => {
+                info!(
+                            self.log,
+                            "Light client finality update";
+                            "peer" => %peer_id,
+                );
                 self.propagate_validation_result(message_id, peer_id, MessageAcceptance::Accept);
             }
             Err(e) => {
                 metrics::register_finality_update_error(&e);
                 match e {
                     LightClientFinalityUpdateError::InvalidLightClientFinalityUpdate => {
-                        debug!(
+                        info!(
                             self.log,
                             "Light client invalid finality update";
                             "peer" => %peer_id,
@@ -1445,7 +1469,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                         );
                     }
                     LightClientFinalityUpdateError::TooEarly => {
-                        debug!(
+                        info!(
                             self.log,
                             "Light client finality update too early";
                             "peer" => %peer_id,
@@ -1458,7 +1482,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                             "light_client_gossip_error",
                         );
                     }
-                    LightClientFinalityUpdateError::FinalityUpdateAlreadySeen => debug!(
+                    LightClientFinalityUpdateError::FinalityUpdateAlreadySeen => info!(
                         self.log,
                         "Light client finality update already seen";
                         "peer" => %peer_id,
@@ -1467,7 +1491,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                     LightClientFinalityUpdateError::BeaconChainError(_)
                     | LightClientFinalityUpdateError::LightClientUpdateError(_)
                     | LightClientFinalityUpdateError::SigSlotStartIsNone
-                    | LightClientFinalityUpdateError::FailedConstructingUpdate => debug!(
+                    | LightClientFinalityUpdateError::FailedConstructingUpdate => info!(
                         self.log,
                         "Light client error constructing finality update";
                         "peer" => %peer_id,
@@ -1492,7 +1516,7 @@ impl<T: BeaconChainTypes> Worker<T> {
             seen_timestamp,
         ) {
             Ok(verified_light_client_optimistic_update) => {
-                debug!(
+                info!(
                     self.log,
                     "Light client successful optimistic update";
                     "peer" => %peer_id,
@@ -1507,7 +1531,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                         metrics::inc_counter(
                             &metrics::BEACON_PROCESSOR_REPROCESSING_QUEUE_SENT_OPTIMISTIC_UPDATES,
                         );
-                        debug!(
+                        info!(
                             self.log,
                             "Optimistic update for unknown block";
                             "peer_id" => %peer_id,
@@ -1534,7 +1558,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                                 )
                             }
                         } else {
-                            debug!(
+                            info!(
                                 self.log,
                                 "Not sending light client update because it had been reprocessed";
                                 "peer_id" => %peer_id,
@@ -1552,7 +1576,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                     LightClientOptimisticUpdateError::InvalidLightClientOptimisticUpdate => {
                         metrics::register_optimistic_update_error(&e);
 
-                        debug!(
+                        info!(
                             self.log,
                             "Light client invalid optimistic update";
                             "peer" => %peer_id,
@@ -1567,7 +1591,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                     }
                     LightClientOptimisticUpdateError::TooEarly => {
                         metrics::register_optimistic_update_error(&e);
-                        debug!(
+                        info!(
                             self.log,
                             "Light client optimistic update too early";
                             "peer" => %peer_id,
@@ -1583,7 +1607,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                     LightClientOptimisticUpdateError::OptimisticUpdateAlreadySeen => {
                         metrics::register_optimistic_update_error(&e);
 
-                        debug!(
+                        info!(
                             self.log,
                             "Light client optimistic update already seen";
                             "peer" => %peer_id,
@@ -1596,7 +1620,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                     | LightClientOptimisticUpdateError::FailedConstructingUpdate => {
                         metrics::register_optimistic_update_error(&e);
 
-                        debug!(
+                        info!(
                             self.log,
                             "Light client error constructing optimistic update";
                             "peer" => %peer_id,
@@ -1631,7 +1655,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                  *
                  * The peer has published an invalid consensus message, _only_ if we trust our own clock.
                  */
-                trace!(
+                info!(
                     self.log,
                     "Attestation is not within the last ATTESTATION_PROPAGATION_SLOT_RANGE slots";
                     "peer_id" => %peer_id,
@@ -1653,6 +1677,15 @@ impl<T: BeaconChainTypes> Worker<T> {
             AttnError::PastSlot { .. } => {
                 // Produce a slot clock frozen at the time we received the message from the
                 // network.
+
+                info!(
+                    self.log,
+                    "Attestation is not within PastSlot slots";
+                    "peer_id" => %peer_id,
+                    "block" => ?beacon_block_root,
+                    "type" => ?attestation_type,
+                );
+
                 let seen_clock = &self.chain.slot_clock.freeze_at(seen_timestamp);
                 let hindsight_verification =
                     attestation_verification::verify_propagation_slot_range(
@@ -1748,13 +1781,13 @@ impl<T: BeaconChainTypes> Worker<T> {
                  *
                  * The peer is not necessarily faulty.
                  */
-                trace!(
-                    self.log,
-                    "Attestation already known";
-                    "peer_id" => %peer_id,
-                    "block" => ?beacon_block_root,
-                    "type" => ?attestation_type,
-                );
+//                info!(
+//                    self.log,
+//                    "Attestation already known";
+//                    "peer_id" => %peer_id,
+//                    "block" => ?beacon_block_root,
+//                    "type" => ?attestation_type,
+//                );
                 self.propagate_validation_result(message_id, peer_id, MessageAcceptance::Ignore);
                 return;
             }
@@ -1765,7 +1798,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                  *
                  * The peer is not necessarily faulty.
                  */
-                trace!(
+                info!(
                     self.log,
                     "Aggregator already known";
                     "peer_id" => %peer_id,
@@ -1786,7 +1819,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                  *
                  * The peer is not necessarily faulty.
                  */
-                debug!(
+                info!(
                     self.log,
                     "Prior attestation known";
                     "peer_id" => %peer_id,
@@ -1807,7 +1840,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                  *
                  * The peer has published an invalid consensus message.
                  */
-                debug!(
+                info!(
                     self.log,
                     "Validation Index too high";
                     "peer_id" => %peer_id,
@@ -1886,6 +1919,13 @@ impl<T: BeaconChainTypes> Worker<T> {
                     //
                     // Don't downscore the peer since it's not clear if we requested this head
                     // block from them or not.
+                info!(
+                    self.log,
+                    "We shouldn't make any further attempts";
+                    "peer_id" => %peer_id,
+                    "block" => ?beacon_block_root,
+                    "type" => ?attestation_type,
+                );
                     self.propagate_validation_result(
                         message_id,
                         peer_id,
@@ -1976,7 +2016,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                 /*
                  * The attestation was received on an incorrect subnet id.
                  */
-                debug!(
+                info!(
                     self.log,
                     "Received attestation on incorrect subnet";
                     "expected" => ?expected,
@@ -2037,7 +2077,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                  *
                  * The message is not necessarily invalid, but we choose to ignore it.
                  */
-                debug!(
+                info!(
                     self.log,
                     "Rejected long skip slot attestation";
                     "head_block_slot" => head_block_slot,
@@ -2053,7 +2093,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                 );
             }
             AttnError::HeadBlockFinalized { beacon_block_root } => {
-                debug!(
+                info!(
                     self.log,
                     "Ignored attestation to finalized block";
                     "block_root" => ?beacon_block_root,
@@ -2073,11 +2113,11 @@ impl<T: BeaconChainTypes> Worker<T> {
             AttnError::BeaconChainError(BeaconChainError::DBError(Error::HotColdDBError(
                 HotColdDBError::AttestationStateIsFinalized { .. },
             ))) => {
-                debug!(self.log, "Attestation for finalized state"; "peer_id" => % peer_id);
+                info!(self.log, "Attestation for finalized state"; "peer_id" => % peer_id);
                 self.propagate_validation_result(message_id, peer_id, MessageAcceptance::Ignore);
             }
             e @ AttnError::BeaconChainError(BeaconChainError::MaxCommitteePromises(_)) => {
-                debug!(
+                info!(
                     self.log,
                     "Dropping attestation";
                     "target_root" => ?failed_att.attestation().data.target.root,
@@ -2110,7 +2150,7 @@ impl<T: BeaconChainTypes> Worker<T> {
             }
         }
 
-        debug!(
+        info!(
             self.log,
             "Invalid attestation from network";
             "reason" => ?error,
@@ -2274,7 +2314,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                  *
                  * The peer has published an invalid consensus message.
                  */
-                debug!(
+                info!(
                     self.log,
                     "Validation Index too high";
                     "peer_id" => %peer_id,
@@ -2288,7 +2328,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                 );
             }
             SyncCommitteeError::UnknownValidatorPubkey(_) => {
-                debug!(
+                info!(
                     self.log,
                     "Validator pubkey is unknown";
                     "peer_id" => %peer_id,
@@ -2305,7 +2345,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                 /*
                  * The sync committee message was received on an incorrect subnet id.
                  */
-                debug!(
+                info!(
                     self.log,
                     "Received sync committee message on incorrect subnet";
                     "expected" => ?expected,
@@ -2337,7 +2377,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                  *
                  * The peer is not necessarily faulty.
                  */
-                debug!(
+                info!(
                     self.log,
                     "Prior sync committee message known";
                     "peer_id" => %peer_id,
@@ -2356,7 +2396,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                  *
                  * The peer is not necessarily faulty.
                  */
-                debug!(
+                info!(
                     self.log,
                     "Prior sync contribution message known";
                     "peer_id" => %peer_id,
@@ -2472,7 +2512,7 @@ impl<T: BeaconChainTypes> Worker<T> {
                 );
             }
         }
-        debug!(
+        trace!(
             self.log,
             "Invalid sync committee message from network";
             "reason" => ?error,

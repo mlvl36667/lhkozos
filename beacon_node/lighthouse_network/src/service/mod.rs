@@ -415,7 +415,7 @@ impl<AppReqId: ReqId, TSpec: EthSpec> Network<AppReqId, TSpec> {
             // strip the p2p protocol if it exists
             strip_peer_id(&mut multiaddr);
             match self.swarm.dial(multiaddr.clone()) {
-                Ok(()) => debug!(self.log, "Dialing libp2p peer"; "address" => %multiaddr),
+                Ok(()) => info!(self.log, "Dialing libp2p peer"; "address" => %multiaddr),
                 Err(err) => {
                     debug!(self.log, "Could not connect to peer"; "address" => %multiaddr, "error" => ?err)
                 }
@@ -597,7 +597,7 @@ impl<AppReqId: ReqId, TSpec: EthSpec> Network<AppReqId, TSpec> {
                 false
             }
             Ok(_) => {
-                debug!(self.log, "Subscribed to topic"; "topic" => %topic);
+                info!(self.log, "Subscribed to topic"; "topic" => %topic);
                 true
             }
         }
@@ -925,7 +925,7 @@ impl<AppReqId: ReqId, TSpec: EthSpec> Network<AppReqId, TSpec> {
         let ping = crate::rpc::Ping {
             data: *self.network_globals.local_metadata.read().seq_number(),
         };
-        trace!(self.log, "Sending Ping"; "peer_id" => %peer_id);
+//        info!(self.log, "Sending Ping"; "peer_id" => %peer_id);
         let id = RequestId::Internal;
         self.eth2_rpc_mut()
             .send_request(peer_id, id, OutboundRequest::Ping(ping));
@@ -1046,14 +1046,14 @@ impl<AppReqId: ReqId, TSpec: EthSpec> Network<AppReqId, TSpec> {
                 // peer that originally published the message.
                 match PubsubMessage::decode(&gs_msg.topic, &gs_msg.data, &self.fork_context) {
                     Err(e) => {
-                        debug!(self.log, "Could not decode gossipsub message"; "topic" => ?gs_msg.topic,"error" => e);
+                        info!(self.log, "Could not decode gossipsub message"; "topic" => ?gs_msg.topic,"error" => e);
                         //reject the message
                         if let Err(e) = self.gossipsub_mut().report_message_validation_result(
                             &id,
                             &propagation_source,
                             MessageAcceptance::Reject,
                         ) {
-                            warn!(self.log, "Failed to report message validation"; "message_id" => %id, "peer_id" => %propagation_source, "error" => ?e);
+                            info!(self.log, "Failed to report message validation"; "message_id" => %id, "peer_id" => %propagation_source, "error" => ?e);
                         }
                     }
                     Ok(msg) => {
@@ -1086,7 +1086,7 @@ impl<AppReqId: ReqId, TSpec: EthSpec> Network<AppReqId, TSpec> {
                                 .publish(Topic::from(topic.clone()), data)
                             {
                                 Ok(_) => {
-                                    warn!(self.log, "Gossip message published on retry"; "topic" => topic_str);
+                                    info!(self.log, "Gossip message published on retry"; "topic" => topic_str);
                                     if let Some(v) = metrics::get_int_counter(
                                         &metrics::GOSSIP_LATE_PUBLISH_PER_TOPIC_KIND,
                                         &[topic_str],
@@ -1095,7 +1095,7 @@ impl<AppReqId: ReqId, TSpec: EthSpec> Network<AppReqId, TSpec> {
                                     };
                                 }
                                 Err(e) => {
-                                    warn!(self.log, "Gossip message publish failed on retry"; "topic" => topic_str, "error" => %e);
+                                    info!(self.log, "Gossip message publish failed on retry"; "topic" => topic_str, "error" => %e);
                                     if let Some(v) = metrics::get_int_counter(
                                         &metrics::GOSSIP_FAILED_LATE_PUBLISH_PER_TOPIC_KIND,
                                         &[topic_str],
@@ -1117,7 +1117,7 @@ impl<AppReqId: ReqId, TSpec: EthSpec> Network<AppReqId, TSpec> {
                 }
             }
             GossipsubEvent::GossipsubNotSupported { peer_id } => {
-                debug!(self.log, "Peer does not support gossipsub"; "peer_id" => %peer_id);
+                info!(self.log, "Peer does not support gossipsub"; "peer_id" => %peer_id);
                 self.peer_manager_mut().report_peer(
                     &peer_id,
                     PeerAction::Fatal,
@@ -1311,6 +1311,21 @@ impl<AppReqId: ReqId, TSpec: EthSpec> Network<AppReqId, TSpec> {
         }
     }
 
+    /// Handle a poc event.
+    fn inject_poc_event(
+        &mut self,
+        event: DiscoveredPeers,
+    ) -> Option<NetworkEvent<AppReqId, TSpec>> {
+        let DiscoveredPeers { peers } = event;
+        let to_dial_peers = self.peer_manager_mut().peers_discovered(peers);
+        for peer_id in to_dial_peers {
+            debug!(self.log, "Dialing discovered peer"; "peer_id" => %peer_id);
+            // For any dial event, inform the peer manager
+            let enr = self.discovery_mut().enr_of_peer(&peer_id);
+            self.peer_manager_mut().dial_peer(&peer_id, enr);
+        }
+        None
+    }
     /// Handle a discovery event.
     fn inject_discovery_event(
         &mut self,
@@ -1427,13 +1442,17 @@ impl<AppReqId: ReqId, TSpec: EthSpec> Network<AppReqId, TSpec> {
                     BehaviourEvent::Identify(ie) => self.inject_identify_event(ie),
                     BehaviourEvent::PeerManager(pe) => self.inject_pm_event(pe),
                 },
-                SwarmEvent::ConnectionEstablished { .. } => None,
+                SwarmEvent::ConnectionEstablished { peer_id, endpoint, num_established, concurrent_dial_errors} =>
+                {
+                    trace!(self.log, "ConnectionEstablished "; "peer_id" => %peer_id, "num_established" => %num_established, "endpoint" => %endpoint.get_remote_address() );
+                    None
+                }
                 SwarmEvent::ConnectionClosed { .. } => None,
                 SwarmEvent::IncomingConnection {
                     local_addr,
                     send_back_addr,
                 } => {
-                    trace!(self.log, "Incoming connection"; "our_addr" => %local_addr, "from" => %send_back_addr);
+                    info!(self.log, "Incoming connection"; "our_addr" => %local_addr, "from" => %send_back_addr);
                     None
                 }
                 SwarmEvent::IncomingConnectionError {
@@ -1441,31 +1460,31 @@ impl<AppReqId: ReqId, TSpec: EthSpec> Network<AppReqId, TSpec> {
                     send_back_addr,
                     error,
                 } => {
-                    debug!(self.log, "Failed incoming connection"; "our_addr" => %local_addr, "from" => %send_back_addr, "error" => %error);
+                    info!(self.log, "Failed incoming connection"; "our_addr" => %local_addr, "from" => %send_back_addr, "error" => %error);
                     None
                 }
                 SwarmEvent::OutgoingConnectionError { peer_id, error } => {
-                    debug!(self.log, "Failed to dial address"; "peer_id" => ?peer_id,  "error" => %error);
+                    trace!(self.log, "Failed to dial address"; "peer_id" => ?peer_id,  "error" => %error);
                     None
                 }
                 SwarmEvent::BannedPeer {
                     peer_id,
                     endpoint: _,
                 } => {
-                    debug!(self.log, "Banned peer connection rejected"; "peer_id" => %peer_id);
+                    info!(self.log, "Banned peer connection rejected"; "peer_id" => %peer_id);
                     None
                 }
                 SwarmEvent::NewListenAddr { address, .. } => {
                     Some(NetworkEvent::NewListenAddr(address))
                 }
                 SwarmEvent::ExpiredListenAddr { address, .. } => {
-                    debug!(self.log, "Listen address expired"; "address" => %address);
+                    info!(self.log, "Listen address expired"; "address" => %address);
                     None
                 }
                 SwarmEvent::ListenerClosed {
                     addresses, reason, ..
                 } => {
-                    crit!(self.log, "Listener closed"; "addresses" => ?addresses, "reason" => ?reason);
+                    info!(self.log, "Listener closed"; "addresses" => ?addresses, "reason" => ?reason);
                     if Swarm::listeners(&self.swarm).count() == 0 {
                         Some(NetworkEvent::ZeroListeners)
                     } else {
@@ -1474,7 +1493,7 @@ impl<AppReqId: ReqId, TSpec: EthSpec> Network<AppReqId, TSpec> {
                 }
                 SwarmEvent::ListenerError { error, .. } => {
                     // this is non fatal, but we still check
-                    warn!(self.log, "Listener error"; "error" => ?error);
+                    info!(self.log, "Listener error"; "error" => ?error);
                     if Swarm::listeners(&self.swarm).count() == 0 {
                         Some(NetworkEvent::ZeroListeners)
                     } else {

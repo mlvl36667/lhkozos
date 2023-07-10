@@ -7,6 +7,9 @@ use serde_derive::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
 use test_random_derive::TestRandom;
 use tree_hash_derive::TreeHash;
+use std::fs::OpenOptions;
+use std::io::Write;
+
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
@@ -50,6 +53,7 @@ impl<T: EthSpec> SyncAggregate<T> {
         }
     }
 
+
     /// Create a `SyncAggregate` from a slice of `SyncCommitteeContribution`s.
     ///
     /// Equivalent to `process_sync_committee_contributions` from the spec.
@@ -60,6 +64,26 @@ impl<T: EthSpec> SyncAggregate<T> {
         let sync_subcommittee_size =
             T::sync_committee_size().safe_div(SYNC_COMMITTEE_SUBNET_COUNT as usize)?;
         for contribution in contributions {
+
+        let mut bitvec0 = String::new();
+        for (position, voted) in contribution.aggregation_bits.iter().enumerate() {
+         if voted {
+          bitvec0.push('1');
+         };
+        if !voted {
+         bitvec0.push('0');
+        }
+        }
+
+        let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/home/e/lighthouse/contributions")
+        .expect("Nem sikerült megnyitni a fájlt.");
+        if let Err(err) = writeln!(file, "{}", bitvec0+"\n") {
+            eprintln!("Nem sikerült kiírni a fájlba: {}", err);
+        }
+
             for (index, participated) in contribution.aggregation_bits.iter().enumerate() {
                 if participated {
                     let participant_index = sync_subcommittee_size

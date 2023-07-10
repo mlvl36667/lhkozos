@@ -3,6 +3,9 @@
 //!
 //! This module exposes one function to extract each type of `SignatureSet` from a `BeaconBlock`.
 use bls::SignatureSet;
+use std::fs::OpenOptions;
+use std::io::Write;
+
 use ssz::DecodeError;
 use std::borrow::Cow;
 use tree_hash::TreeHash;
@@ -325,6 +328,17 @@ where
         fork,
         genesis_validators_root,
     );
+
+    let attesting_indices_len = indexed_attestation.attesting_indices.len();
+    let attesting_indices_len_str = attesting_indices_len.to_string();
+
+        let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/home/e/lighthouse/indexed_attestation_signature_set_from_pubkeys")
+        .expect("Nem sikerült megnyitni a fájlt.");
+        let output = format!("indexed_attestation.attesting_indices.len: {}\n", attesting_indices_len_str);
+        file.write_all(output.as_bytes());
 
     let message = indexed_attestation.data.signing_root(domain);
 

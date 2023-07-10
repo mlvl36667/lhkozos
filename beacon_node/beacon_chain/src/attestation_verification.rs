@@ -43,7 +43,7 @@ use crate::{
 };
 use bls::verify_signature_sets;
 use proto_array::Block as ProtoBlock;
-use slog::debug;
+use slog::{crit, debug, error, info, trace, warn, Logger};
 use slot_clock::SlotClock;
 use state_processing::{
     common::get_indexed_attestation,
@@ -54,6 +54,8 @@ use state_processing::{
     },
 };
 use std::borrow::Cow;
+use std::fs::OpenOptions;
+use std::io::Write;
 use strum::AsRefStr;
 use tree_hash::TreeHash;
 use types::{
@@ -450,6 +452,24 @@ impl<'a, T: BeaconChainTypes> IndexedAggregatedAttestation<'a, T> {
     ) -> Result<Hash256, Error> {
         let attestation = &signed_aggregate.message.aggregate;
 
+// Bence modositas
+        let bitvec = chain.clone().getbv(attestation);
+        info!(
+         chain.log,
+         "verify_early_checks IndexedAggregatedAttestation()";
+         "bitvec" => &bitvec,
+        );
+
+        let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/home/e/lighthouse/verify_early_checks")
+        .expect("Nem sikerült megnyitni a fájlt.");
+        if let Err(err) = writeln!(file, "{}", bitvec+"\n") {
+            eprintln!("Nem sikerült kiírni a fájlba: {}", err);
+        }
+
+
         // Ensure attestation is within the last ATTESTATION_PROPAGATION_SLOT_RANGE slots (within a
         // MAXIMUM_GOSSIP_CLOCK_DISPARITY allowance).
         //
@@ -720,9 +740,18 @@ impl<'a, T: BeaconChainTypes> IndexedUnaggregatedAttestation<'a, T> {
         // We do not queue future attestations for later processing.
         verify_propagation_slot_range(&chain.slot_clock, attestation)?;
 
+        let bitvec = chain.clone().getbv(attestation);
+        info!(
+         chain.log,
+         "verify_early_checks ";
+         "bitvec" => bitvec,
+        );
+
+
         // Check to ensure that the attestation is "unaggregated". I.e., it has exactly one
         // aggregation bit set.
         let num_aggregation_bits = attestation.aggregation_bits.num_set_bits();
+
         if num_aggregation_bits != 1 {
             return Err(Error::NotExactlyOneAggregationBitSet(num_aggregation_bits));
         }
@@ -1182,6 +1211,11 @@ pub fn verify_signed_aggregate_signatures<T: BeaconChainTypes>(
         .spec
         .fork_at_epoch(indexed_attestation.data.target.epoch);
 
+        info!(
+         chain.log,
+         "verify_signed_aggregate_signatures ";
+         "epoch" => indexed_attestation.data.target.epoch,
+        );
     let signature_sets = vec![
         signed_aggregate_selection_proof_signature_set(
             |validator_index| pubkey_cache.get(validator_index).map(Cow::Borrowed),

@@ -4,6 +4,9 @@ use serde_derive::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
 use test_random_derive::TestRandom;
 use tree_hash_derive::TreeHash;
+use std::fs::OpenOptions;
+use std::io::Write;
+
 
 use crate::slot_data::SlotData;
 use crate::{test_utils::TestRandom, Hash256, Slot};
@@ -59,7 +62,27 @@ impl<T: EthSpec> Attestation<T> {
         debug_assert_eq!(self.data, other.data);
         debug_assert!(self.signers_disjoint_from(other));
 
+// Bence modositas
         self.aggregation_bits = self.aggregation_bits.union(&other.aggregation_bits);
+        let mut bitvec0 = String::new();
+        for (position, voted) in self.aggregation_bits.iter().enumerate() {
+         if voted {
+          bitvec0.push('1');
+         };
+        if !voted {
+         bitvec0.push('0');
+        }
+        }
+
+        let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/home/e/lighthouse/aggregate")
+        .expect("Nem sikerült megnyitni a fájlt.");
+        if let Err(err) = writeln!(file, "{}", bitvec0+"\n") {
+            eprintln!("Nem sikerült kiírni a fájlba: {}", err);
+        }
+
         self.signature.add_assign_aggregate(&other.signature);
     }
 
