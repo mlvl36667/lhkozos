@@ -6,6 +6,10 @@ use ssz_derive::{Decode, Encode};
 use std::hash::{Hash, Hasher};
 use test_random_derive::TestRandom;
 use tree_hash_derive::TreeHash;
+use std::io::Write;
+use std::fs::{File, OpenOptions};
+use std::io::prelude::*;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Details an attestation that can be slashable.
 ///
@@ -50,6 +54,40 @@ impl<T: EthSpec> IndexedAttestation<T> {
         self.data.source.epoch < other.data.source.epoch
             && other.data.target.epoch < self.data.target.epoch
     }
+    pub fn write_integers_to_file(&self, file_path: &str) -> std::io::Result<()> {
+    let mut file = OpenOptions::new()
+        .write(true)
+        .append(true)
+        .create(true)
+        .open(file_path)?;
+
+    let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Failed to get timestamp");
+    let attesting_indices_len = self.attesting_indices.len();
+    let attesting_indices_len_str = attesting_indices_len.to_string();
+    
+        file.write_all(b"<datapoint>")?; // Add hozzá az újsor karaktert
+        file.write_all(b"<att_ind>")?; // Add hozzá az újsor karaktert
+        // Iterálj végig a változókon a VariableList-ben
+        for integer in self.attesting_indices.iter() {
+            // Írd ki az egész számot a fájlba
+            file.write_all(integer.to_string().as_bytes())?;
+            file.write_all(b" ")?; // Add hozzá az újsor karaktert
+        }
+            file.write_all(b"</att_ind>")?; // Add hozzá az újsor karaktert
+            file.write_all(b"<len>")?; // Add hozzá az újsor karaktert
+            file.write_all(attesting_indices_len_str.as_bytes())?;
+            file.write_all(b"</len>")?; // Add hozzá az újsor karaktert
+            file.write_all(b"<timestamp>")?; // Add hozzá az újsor karaktert
+            file.write_all(timestamp.as_secs().to_string().as_bytes())?;
+            file.write_all(b"</timestamp>")?; // Add hozzá az újsor karaktert
+            file.write_all(b"</datapoint>")?; // Add hozzá az újsor karaktert
+            file.write_all(b"\n")?; // Add hozzá az újsor karaktert
+    
+        Ok(())
+    }
+
 }
 
 /// Implementation of non-crypto-secure `Hash`, for use with `HashMap` and `HashSet`.

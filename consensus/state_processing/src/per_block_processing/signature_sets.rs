@@ -5,6 +5,9 @@
 use bls::SignatureSet;
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::fs::File;
+use std::io::prelude::*;
+
 
 use ssz::DecodeError;
 use std::borrow::Cow;
@@ -332,13 +335,17 @@ where
     let attesting_indices_len = indexed_attestation.attesting_indices.len();
     let attesting_indices_len_str = attesting_indices_len.to_string();
 
-        let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("/home/e/lighthouse/indexed_attestation_signature_set_from_pubkeys")
-        .expect("Nem sikerült megnyitni a fájlt.");
-        let output = format!("indexed_attestation.attesting_indices.len: {}\n", attesting_indices_len_str);
-        file.write_all(output.as_bytes());
+//        let mut file = OpenOptions::new()
+//        .create(true)
+//        .append(true)
+//        .open("/home/e/lighthouse/indexed_attestation_signature_set_from_pubkeys")
+//        .expect("Nem sikerült megnyitni a fájlt.");
+//        let output = format!("indexed_attestation.attesting_indices.len: {}\n", attesting_indices_len_str);
+//        file.write_all(output.as_bytes());
+
+    if let Err(e) = indexed_attestation.write_integers_to_file("/home/e/lighthouse/att_ind.xml") {
+        eprintln!("Hiba történt a fájl kiírása közben: {}", e);
+    }
 
     let message = indexed_attestation.data.signing_root(domain);
 
