@@ -44,6 +44,7 @@ use crate::{
 use bls::verify_signature_sets;
 use proto_array::Block as ProtoBlock;
 use slog::{crit, debug, error, info, trace, warn, Logger};
+use std::fs::{File, OpenOptions};
 use slot_clock::SlotClock;
 use state_processing::{
     common::get_indexed_attestation,
@@ -54,7 +55,6 @@ use state_processing::{
     },
 };
 use std::borrow::Cow;
-use std::fs::OpenOptions;
 use std::io::Write;
 use strum::AsRefStr;
 use tree_hash::TreeHash;
@@ -454,20 +454,44 @@ impl<'a, T: BeaconChainTypes> IndexedAggregatedAttestation<'a, T> {
 
 // Bence modositas
         let bitvec = chain.clone().getbv(attestation);
+        let compbv = chain.clone().encode_rle(&bitvec);
         info!(
          chain.log,
          "verify_early_checks IndexedAggregatedAttestation()";
          "bitvec" => &bitvec,
+         "compbv" => &compbv,
         );
 
-        let mut file = OpenOptions::new()
-        .create(true)
+let file_result = OpenOptions::new()
+        .write(true)
         .append(true)
-        .open("/home/e/lighthouse/verify_early_checks")
-        .expect("Nem sikerült megnyitni a fájlt.");
-        if let Err(err) = writeln!(file, "{}", bitvec+"\n") {
-            eprintln!("Nem sikerült kiírni a fájlba: {}", err);
+        .create(true)
+        .open("/home/e/lighthouse/compression.xml");
+
+    match file_result {
+        Ok(mut file) => {
+            if let Err(err) = file.write_all(b"<datapoint>\n") {
+                eprintln!("Failed to write to file: {}", err);
+            } else {
+
+        file.write_all(b"<bitvec>"); // Add hozzá az újsor karaktert
+        file.write_all(bitvec.as_bytes());
+        file.write_all(b"</bitvec>"); // Add hozzá az újsor karaktert
+        file.write_all(b"<compressed>"); // Add hozzá az újsor karaktert
+        file.write_all(compbv.as_bytes());
+        file.write_all(b"</compressed>"); // Add hozzá az újsor karaktert
+        file.write_all(b"</datapoint>"); // Add hozzá az újsor karaktert
+        file.write_all(b"\n"); // Add hozzá az újsor karaktert
+            }
         }
+        Err(err) => {
+            eprintln!("Failed to open file: {}", err);
+        }
+    }
+
+
+
+
 
 
         // Ensure attestation is within the last ATTESTATION_PROPAGATION_SLOT_RANGE slots (within a
@@ -1214,6 +1238,7 @@ pub fn verify_signed_aggregate_signatures<T: BeaconChainTypes>(
         info!(
          chain.log,
          "verify_signed_aggregate_signatures ";
+         "aggregator_index" => aggregator_index,
          "epoch" => indexed_attestation.data.target.epoch,
         );
     let signature_sets = vec![

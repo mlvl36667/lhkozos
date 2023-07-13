@@ -443,6 +443,24 @@ impl<T: BeaconChainTypes> BeaconChain<T> {
                      }
      bitvec0
     }
+    pub fn encode_rle(&self, bit_vector: &str) -> String {
+        let mut encoded = String::new();
+        let mut count = 1;
+    
+        let bit_chars: Vec<char> = bit_vector.chars().collect();
+    
+        for i in 1..bit_chars.len() {
+            if bit_chars[i] == bit_chars[i - 1] {
+                count += 1;
+            } else {
+                encoded.push_str(&format!("{}|{}", count, bit_chars[i - 1]));
+                count = 1;
+            }
+        }
+    
+        encoded.push_str(&format!("{}|{}", count, bit_chars[bit_chars.len() - 1]));
+        encoded
+    }
     pub fn is_finalized_block(
         &self,
         block_root: &Hash256,
