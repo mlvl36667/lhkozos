@@ -453,12 +453,12 @@ impl<T: BeaconChainTypes> BeaconChain<T> {
             if bit_chars[i] == bit_chars[i - 1] {
                 count += 1;
             } else {
-                encoded.push_str(&format!("{}|{}", count, bit_chars[i - 1]));
+                encoded.push_str(&format!("|{}|{}", count, bit_chars[i - 1]));
                 count = 1;
             }
         }
     
-        encoded.push_str(&format!("{}|{}", count, bit_chars[bit_chars.len() - 1]));
+        encoded.push_str(&format!("|{}|{}", count, bit_chars[bit_chars.len() - 1]));
         encoded
     }
     pub fn is_finalized_block(
